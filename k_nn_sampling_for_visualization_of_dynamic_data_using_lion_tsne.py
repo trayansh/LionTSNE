@@ -19,72 +19,88 @@ import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 from pyDOE2 import lhs
 from sklearn.metrics import accuracy_score
-iris = load_iris()
-
-iris = load_iris()
-
+#X is the Data of Dataset
 X = iris.data
+# Y is the lables
 Y = iris.target
 
-def KNN_sampling(X, y, k):
-    train_sample = []
-    Y = []
+def KNN_sampling(X,y,k):
 
-    n_samples = X.shape[0]
+  train_sample = []
+  Y =[]
 
-    while n_samples > k:
-        neigh = KNeighborsClassifier(n_neighbors=k, algorithm='ball_tree').fit(X, y)
-        indices = neigh.kneighbors(X, return_distance=False)
+  while(len(X)>k):
+    neigh = KNeighborsClassifier(n_neighbors=k,algorithm='ball_tree').fit(X,y)
+    indices = neigh.kneighbors(X, return_distance = False)
+    NN_scores = []
+    MNN_scores = []
+    # Calculation of MNN and NN Scores
+    neighbors = {i:set() for i in range(len(X))}
+    M_neighbors = {i:set() for i in range(len(X))}
+    for i in range(len(X)):
+      xi = X[i]
+      mnn = []
+      for j in indices[i]:
+        xj = X[j]
+        if i != j:
+          neighbors[j].add(i)
 
-        # Calculate MNN and NN Scores
-        neighbors = [set() for _ in range(n_samples)]
-        M_neighbors = [set() for _ in range(n_samples)]
-        MNN_scores = [0] * n_samples
-        NN_scores = [0] * n_samples
+          mutual_neighbor = set(indices[i][1:]).intersection(indices[j][1:])
 
-        for i in range(n_samples):
-            mutual_neighbors = set(indices[i][1:]).intersection(*[indices[j][1:] for j in indices[i]])
+          if xi in X[list(mutual_neighbor)] and xj in X[list(mutual_neighbor)]:
+            mnn.extend(mutual_neighbor)
 
-            for j in mutual_neighbors:
-                if i != j:
-                    neighbors[j].add(i)
-                    M_neighbors[i].add(j)
-                    MNN_scores[i] += 1
+      MNN_scores.append(len(set(mnn)))
+      for t in mnn:
+        M_neighbors[i].add(t)
 
-            NN_scores[i] = len(neighbors[i])
+    for i in range(len(X)):
+      NN_scores.append(len(neighbors[i]))
 
-        # Calculate Index
-        max_nn_score = max(NN_scores)
-        index = [i for i, x in enumerate(NN_scores) if x == max_nn_score]
+    # Calculation of Index
 
-        if len(index) > 1:
-            temp_index = [MNN_scores[i] for i in index]
-            train_index = index[temp_index.index(max(temp_index))]
-        else:
-            train_index = index[0]
+    index = [i for i,x in enumerate(NN_scores) if(x == np.max(NN_scores))]
 
-        train_sample.append(X[train_index])
-        Y.append(y[train_index])
+    if(len(index)>1):
+      temp_index = [MNN_scores[i] for i in index]
+      train_index = index[temp_index.index(np.max(temp_index))]
+    else:
+      train_index = index[0]
 
-        X = np.delete(X, train_index, axis=0)
-        y = np.delete(y, train_index)
+    train_sample.append(X[train_index])
+    Y.append(y[train_index])
+    X = np.delete(X,train_index,axis=0)
+    y = np.delete(y,train_index,axis=0)
+    for n_index in M_neighbors[train_index]:
+      if n_index < X.shape[0]:
+        X = np.delete(X,n_index,axis=0)
+        y = np.delete(y,n_index,axis=0)
 
-        for n_index in M_neighbors[train_index]:
-            if n_index < X.shape[0]:
-                X = np.delete(X, n_index, axis=0)
-                y = np.delete(y, n_index)
+        # (t,m,s)Net For Reamining X Sampling
+  if(len(X) !=0):
+    num_samples = X.shape[0]
+    num_dimensions = X.shape[1]
+    lhs_samples = lhs(num_dimensions, num_samples)
+    Y.extend(y)
+    for sample in lhs_samples:
+      train_sample.append(sample)
 
-        n_samples = X.shape[0]
+  return train_sample, Y
 
-    # Sampling for remaining X using (t,m,s)-Net
-    if n_samples != 0:
-        num_samples = X.shape[0]
-        num_dimensions = X.shape[1]
-        lhs_samples = lhs(num_dimensions, num_samples)
-        Y.extend(y)
-        train_sample.extend(X)
+#KNN Sampling
+train_sample,train_sample_result = KNN_sampling(X,Y,10)
 
-    return train_sample, Y
+#TSNE for HD to LD
+tsne_results=[]
+train_sample_tsne = TSNE(n_components = 3, perplexity = 10, random_state=32).fit_transform(np.array(train_sample))
+tsne_results.append(train_sample_tsne)
+
+#KNN accuracy
+knn = KNeighborsClassifier(n_neighbors=3)
+knn.fit(np.array(tsne_results[0]), train_sample_result)
+y_pred = knn.predict(tsne_results[0])
+accuracy_score(train_sample_result,y_pred)
+
 
 # KNN Sampling
 train_sample, train_sample_result = KNN_sampling(X, Y, 10)
