@@ -76,7 +76,7 @@ def KNN_sampling(X, y, k):
 
         n_samples = X.shape[0]
 
-    # Sampling for remaining X
+    # Sampling for remaining X using (t,m,s)-Net
     if n_samples != 0:
         num_samples = X.shape[0]
         num_dimensions = X.shape[1]
